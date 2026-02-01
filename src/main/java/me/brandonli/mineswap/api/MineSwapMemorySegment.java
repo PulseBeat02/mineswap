@@ -8,7 +8,7 @@ import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public final class MineSwapMemorySegment implements AutoCloseable {
+public final class MineSwapMemorySegment implements MemorySegment {
 
   private final LinkedHashMap<Long, PageFrame> cache;
   private final MineSwapClient client;
@@ -75,6 +75,7 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     }
   }
 
+  @Override
   public void flushAll() {
     this.cache.forEach(this::flush);
   }
@@ -98,12 +99,14 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     return (int) (address % Page.PAGE_SIZE_BYTES);
   }
 
+  @Override
   public byte getByte(final long addr) {
     this.check(addr, 1);
     final PageFrame frame = this.page(this.pageId(addr));
     return frame.data[this.offset(addr)];
   }
 
+  @Override
   public void setByte(final long address, final byte value) {
     this.check(address, 1);
     final PageFrame frame = this.page(this.pageId(address));
@@ -133,6 +136,7 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     }
   }
 
+  @Override
   public int getInt(final long address) {
     this.check(address, 4);
     if (this.crossesPageBoundary(address, 4)) {
@@ -142,6 +146,7 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     return this.buf(frame.data).getInt(this.offset(address));
   }
 
+  @Override
   public void setInt(final long address, final int value) {
     this.check(address, 4);
     if (this.crossesPageBoundary(address, 4)) {
@@ -155,6 +160,7 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     frame.dirty = true;
   }
 
+  @Override
   public char getChar(final long address) {
     this.check(address, 2);
     if (this.crossesPageBoundary(address, 2)) {
@@ -164,6 +170,7 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     return this.buf(frame.data).getChar(this.offset(address));
   }
 
+  @Override
   public void setChar(final long address, final char value) {
     this.check(address, 2);
     if (this.crossesPageBoundary(address, 2)) {
@@ -177,6 +184,7 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     frame.dirty = true;
   }
 
+  @Override
   public long getLong(final long address) {
     this.check(address, 8);
     if (this.crossesPageBoundary(address, 8)) {
@@ -186,6 +194,7 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     return this.buf(frame.data).getLong(this.offset(address));
   }
 
+  @Override
   public void setLong(final long address, final long value) {
     this.check(address, 8);
     if (this.crossesPageBoundary(address, 8)) {
