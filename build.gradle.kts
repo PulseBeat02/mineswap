@@ -10,6 +10,7 @@ plugins {
     id("org.checkerframework") version "0.6.61"
     id("com.diffplug.spotless") version "8.2.0"
     id("xyz.jpenilla.resource-factory-paper-convention") version "1.3.1"
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.19"
 }
 
 apply(plugin = "org.checkerframework")
@@ -26,6 +27,7 @@ repositories {
 }
 
 dependencies {
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     compileOnly("com.fastasyncworldedit:FastAsyncWorldEdit-Core")
     compileOnly("com.fastasyncworldedit:FastAsyncWorldEdit-Bukkit") { isTransitive = false }

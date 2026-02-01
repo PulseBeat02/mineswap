@@ -17,17 +17,11 @@
  */
 package me.brandonli.mineswap;
 
-import com.sk89q.worldedit.world.block.BlockType;
+import java.util.concurrent.CompletableFuture;
 
-public interface WorldTransaction {
+public record PageWriteTask(long pageId, byte[] data, CompletableFuture<Void> future) {
 
-  int getX();
-
-  int getY();
-
-  int getZ();
-
-  int getChunkIndex();
-
-  BlockType getMaterial();
+  public int getChunkIndex() {
+    return (int) (this.pageId / Page.PAGES_PER_CHUNK);
+  }
 }

@@ -26,22 +26,18 @@ import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 public final class HTTPMineSwapServer implements MineSwapServer {
 
   private final MineSwap plugin;
   private final BlockPagedStore store;
-  private final ExecutorService asyncExecutor;
 
   private @Nullable Javalin app;
 
   public HTTPMineSwapServer(final MineSwap plugin, final BlockPagedStore store) {
     this.plugin = plugin;
     this.store = store;
-    this.asyncExecutor = Executors.newWorkStealingPool();
   }
 
   public void start() {
@@ -57,7 +53,6 @@ public final class HTTPMineSwapServer implements MineSwapServer {
     Preconditions.checkNotNull(this.app, "Server is already stopped");
     final Javalin app = requireNonNull(this.app);
     app.stop();
-    this.asyncExecutor.shutdown();
     this.app = null;
   }
 
@@ -81,16 +76,12 @@ public final class HTTPMineSwapServer implements MineSwapServer {
       return;
     }
 
-    if (res.length != Page.PAGE_SIZE) {
+    if (res.length != Page.PAGE_SIZE_BYTES) {
       this.error(context, ERROR_INVALID_PAGE_SIZE);
       return;
     }
 
-    final CompletableFuture<Void> future = CompletableFuture.runAsync(
-        () -> {
-          this.store.queueWritePage(id, res);
-        },
-        this.asyncExecutor);
+    final CompletableFuture<Void> future = this.store.queueWritePage(id, res);
     context.future(() -> future.thenRun(() -> context.status(HttpStatus.OK)));
   }
 
@@ -101,12 +92,8 @@ public final class HTTPMineSwapServer implements MineSwapServer {
     }
 
     final int id = optionalId.getAsInt();
-    final CompletableFuture<String> future = CompletableFuture.supplyAsync(
-        () -> {
-          final byte[] result = this.store.readPage(id);
-          return IOUtils.encodeIntoBase64(result);
-        },
-        this.asyncExecutor);
+    final CompletableFuture<String> future =
+        this.store.readPageAsync(id).thenApply(IOUtils::encodeIntoBase64);
     context.future(() -> future.thenAccept(context::result));
   }
 

@@ -18,100 +18,57 @@
 package me.brandonli.mineswap;
 
 import com.google.common.base.Preconditions;
-import com.sk89q.worldedit.EditSession;
-import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldedit.world.block.BlockState;
-import com.sk89q.worldedit.world.block.BlockType;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import org.bukkit.Material;
+import java.util.concurrent.CompletableFuture;
+import org.bukkit.Bukkit;
+import org.bukkit.scheduler.BukkitScheduler;
 
 public final class BlockPagedStore {
 
-  private static final BlockType[] PALETTE = IOUtils.getLinesFromResource("palette.txt").stream()
-      .map(Material::valueOf)
-      .map(BukkitAdapter::asBlockType)
-      .filter(Objects::nonNull)
-      .toArray(BlockType[]::new);
-  private static final Map<BlockType, Integer> INDEX_PALETTE = Arrays.stream(PALETTE)
-      .collect(Collectors.toMap(type -> type, type -> Arrays.asList(PALETTE).indexOf(type)));
-
   private final MineSwap plugin;
-  private final BlockTransactionQueue queue;
+  private final NMSChunkAccessor accessor;
+  private final ParallelPageQueue writeQueue;
 
-  public BlockPagedStore(final MineSwap plugin, final BlockTransactionQueue queue) {
+  public BlockPagedStore(final MineSwap plugin, final NMSChunkAccessor accessor) {
     this.plugin = plugin;
-    this.queue = queue;
+    this.accessor = accessor;
+    this.writeQueue = new ParallelPageQueue(plugin, accessor);
   }
 
-  private int getChunkIndex(final long pageId) {
-    return (int) (pageId / Page.PAGES_PER_CHUNK);
-  }
-
-  private int getPageInChunk(final long pageId) {
-    return (int) (pageId % Page.PAGES_PER_CHUNK);
-  }
-
-  private int getChunkX(final int chunkIndex) {
-    return (chunkIndex % Page.CHUNKS_PER_ROW) * Page.CHUNK_SIZE;
-  }
-
-  private int getChunkZ(final int chunkIndex) {
-    return (chunkIndex / Page.CHUNKS_PER_ROW) * Page.CHUNK_SIZE;
-  }
-
-  private int getBaseY(final int pageInChunk) {
-    return Page.MIN_Y + (pageInChunk * Page.LAYERS_PER_PAGE);
-  }
-
-  public void queueWritePage(final long pageId, final byte[] data) {
+  public CompletableFuture<Void> queueWritePage(final long pageId, final byte[] data) {
     Preconditions.checkArgument(
         data.length == Page.PAGE_SIZE_BYTES,
         "Expected " + Page.PAGE_SIZE_BYTES + " bytes, got " + data.length);
-    final int chunkIndex = this.getChunkIndex(pageId);
-    final int pageInChunk = this.getPageInChunk(pageId);
-    final int chunkX = this.getChunkX(chunkIndex);
-    final int chunkZ = this.getChunkZ(chunkIndex);
-    final int baseY = this.getBaseY(pageInChunk);
-    for (int i = 0; i < data.length; i++) {
-      final int v = data[i] & 0xFF;
-      final int localX = i % Page.CHUNK_SIZE;
-      final int localZ = (i / Page.CHUNK_SIZE) % Page.CHUNK_SIZE;
-      final int localY = i / Page.CHUNK_BLOCKS_PER_LAYER;
-      final int x = chunkX + localX;
-      final int y = baseY + localY;
-      final int z = chunkZ + localZ;
-      final BlockType type = PALETTE[v];
-      final BlockWorldTransaction transaction =
-          new BlockWorldTransaction(type, x, y, z, chunkIndex);
-      this.queue.enqueue(transaction);
+    return this.writeQueue.queueWrite(pageId, data);
+  }
+
+  public CompletableFuture<byte[]> readPageAsync(final long pageId) {
+    if (Bukkit.isPrimaryThread()) {
+      final byte[] read = this.accessor.readPage(pageId);
+      return CompletableFuture.completedFuture(read);
     }
+
+    final CompletableFuture<byte[]> future = new CompletableFuture<>();
+    final BukkitScheduler scheduler = Bukkit.getScheduler();
+    scheduler.runTask(this.plugin, () -> {
+      try {
+        final byte[] result = this.accessor.readPage(pageId);
+        future.complete(result);
+      } catch (final Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
   }
 
   public byte[] readPage(final long pageId) {
-    final int chunkIndex = this.getChunkIndex(pageId);
-    final int pageInChunk = this.getPageInChunk(pageId);
-    final int chunkX = this.getChunkX(chunkIndex);
-    final int chunkZ = this.getChunkZ(chunkIndex);
-    final int baseY = this.getBaseY(pageInChunk);
-    final byte[] out = new byte[Page.PAGE_SIZE_BYTES];
-    try (final EditSession session = this.plugin.createEditSession()) {
-      for (int i = 0; i < out.length; i++) {
-        final int localX = i % Page.CHUNK_SIZE;
-        final int localZ = (i / Page.CHUNK_SIZE) % Page.CHUNK_SIZE;
-        final int localY = i / Page.CHUNK_BLOCKS_PER_LAYER;
-        final int x = chunkX + localX;
-        final int y = baseY + localY;
-        final int z = chunkZ + localZ;
-        final BlockVector3 vec = BlockVector3.at(x, y, z);
-        final BlockState state = session.getBlock(vec);
-        final BlockType type = state.getBlockType();
-        out[i] = (byte) INDEX_PALETTE.getOrDefault(type, 0).intValue();
-      }
-    }
-    return out;
+    return this.readPageAsync(pageId).join();
+  }
+
+  public int getQueueSize() {
+    return this.writeQueue.size();
+  }
+
+  public void shutdown() {
+    this.writeQueue.shutdown();
   }
 }

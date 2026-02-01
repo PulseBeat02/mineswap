@@ -17,46 +17,79 @@
  */
 package me.brandonli.mineswap;
 
-import com.sk89q.worldedit.EditSession;
-import com.sk89q.worldedit.WorldEdit;
-import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import java.util.List;
+import static java.util.Objects.requireNonNull;
+
 import org.bukkit.Bukkit;
+import org.bukkit.GameRules;
 import org.bukkit.World;
+import org.bukkit.WorldCreator;
+import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class MineSwap extends JavaPlugin {
 
   private HTTPMineSwapServer server;
-  private BlockTransactionQueue queue;
-
-  @SuppressWarnings("deprecation")
-  public EditSession createEditSession() {
-    final List<World> worlds = Bukkit.getWorlds();
-    final World world = worlds.getFirst();
-    final com.sk89q.worldedit.world.World wrapped = BukkitAdapter.adapt(world);
-    final WorldEdit worldEdit = WorldEdit.getInstance();
-    final EditSession session = worldEdit.newEditSession(wrapped);
-    session.setFastMode(true);
-    session.setBatchingChunks(true);
-    return session;
-  }
+  private BlockPagedStore store;
+  private World swapWorld;
 
   @Override
   public void onEnable() {
-    this.queue = new BlockTransactionQueue(this);
-    final BlockPagedStore store = new BlockPagedStore(this, this.queue);
-    this.server = new HTTPMineSwapServer(this, store);
+    final NMSChunkAccessor accessor = new NMSChunkAccessor();
+    this.swapWorld = this.getOrCreateSwapWorld();
+    this.store = new BlockPagedStore(this, accessor);
+    this.server = new HTTPMineSwapServer(this, this.store);
     this.server.start();
   }
 
   @Override
   public void onDisable() {
-    if (this.queue != null) {
-      this.queue.shutdown();
-    }
     if (this.server != null) {
       this.server.stop();
     }
+    if (this.store != null) {
+      this.store.shutdown();
+    }
+  }
+
+  private World getOrCreateSwapWorld() {
+    final World check = Bukkit.getWorld(Page.PAGE_WORLD_NAME);
+    if (check != null) {
+      return check;
+    }
+
+    final WorldCreator creator = this.createGenerator();
+    return this.createWorld(creator);
+  }
+
+  private WorldCreator createGenerator() {
+    final WorldCreator creator = new WorldCreator(Page.PAGE_WORLD_NAME);
+    final ChunkGenerator generator = new VoidChunkGenerator();
+    creator.generator(generator);
+    creator.generateStructures(false);
+    return creator;
+  }
+
+  private World createWorld(final WorldCreator creator) {
+    final World world = requireNonNull(creator.createWorld());
+    world.setGameRule(GameRules.SPAWN_MOBS, false);
+    world.setGameRule(GameRules.ADVANCE_TIME, false);
+    world.setGameRule(GameRules.ADVANCE_WEATHER, false);
+    world.setGameRule(GameRules.FIRE_DAMAGE, false);
+    world.setGameRule(GameRules.RANDOM_TICK_SPEED, 0);
+    world.setGameRule(GameRules.BLOCK_DROPS, false);
+    world.setGameRule(GameRules.ENTITY_DROPS, false);
+    world.setGameRule(GameRules.MOB_DROPS, false);
+    world.setGameRule(GameRules.MOB_GRIEFING, false);
+    world.setGameRule(GameRules.RAIDS, false);
+    world.setGameRule(GameRules.SPAWN_PHANTOMS, false);
+    world.setGameRule(GameRules.SPAWN_PATROLS, false);
+    world.setGameRule(GameRules.SPAWN_WANDERING_TRADERS, false);
+    world.setGameRule(GameRules.SPAWN_WARDENS, false);
+    world.setAutoSave(true);
+    return world;
+  }
+
+  public World getSwapWorld() {
+    return this.swapWorld;
   }
 }
