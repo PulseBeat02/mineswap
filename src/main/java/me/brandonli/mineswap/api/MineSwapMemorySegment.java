@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import me.brandonli.mineswap.Page;
+import me.brandonli.mineswap.page.Page;
 
 public final class MineSwapMemorySegment implements MemorySegment {
 

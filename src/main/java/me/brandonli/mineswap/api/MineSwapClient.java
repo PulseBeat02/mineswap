@@ -27,8 +27,8 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import me.brandonli.mineswap.IOUtils;
-import me.brandonli.mineswap.Page;
+import me.brandonli.mineswap.page.Page;
+import me.brandonli.mineswap.utils.IOUtils;
 
 public final class MineSwapClient {
 

@@ -20,6 +20,7 @@ package me.brandonli.mineswap;
 import java.util.Random;
 import me.brandonli.mineswap.api.MineSwapClient;
 import me.brandonli.mineswap.api.MineSwapMemorySegment;
+import me.brandonli.mineswap.page.Page;
 
 public final class ExamplePaging {
 

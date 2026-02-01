@@ -15,10 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package me.brandonli.mineswap;
+package me.brandonli.mineswap.page;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import me.brandonli.mineswap.MineSwap;
+import me.brandonli.mineswap.page.accessor.PageAccessor;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
@@ -26,17 +28,15 @@ import org.bukkit.scheduler.BukkitTask;
 public final class ParallelPageQueue {
 
   private final ConcurrentLinkedQueue<PageWriteTask> queue;
-  private final NMSChunkAccessor accessor;
   private final BukkitTask processorTask;
   private final MineSwap plugin;
 
   private volatile boolean running;
 
   @SuppressWarnings("all")
-  public ParallelPageQueue(final MineSwap plugin, final NMSChunkAccessor accessor) {
+  public ParallelPageQueue(final MineSwap plugin) {
     this.queue = new ConcurrentLinkedQueue<>();
     this.plugin = plugin;
-    this.accessor = accessor;
     this.running = true;
     this.processorTask = this.startProcessing();
   }
@@ -51,6 +51,7 @@ public final class ParallelPageQueue {
       return;
     }
 
+    final PageAccessor accessor = this.plugin.getPageAccessor();
     final long startTime = System.nanoTime();
     int processed = 0;
     while (processed < Page.PAGES_PER_TICK && !this.queue.isEmpty()) {
@@ -63,7 +64,7 @@ public final class ParallelPageQueue {
       try {
         final long id = task.pageId();
         final byte[] data = task.data();
-        this.accessor.writePage(id, data);
+        accessor.writePage(id, data);
         future.complete(null);
       } catch (final Exception e) {
         future.completeExceptionally(e);
@@ -103,13 +104,14 @@ public final class ParallelPageQueue {
       return;
     }
 
+    final PageAccessor accessor = this.plugin.getPageAccessor();
     PageWriteTask task;
     while ((task = this.queue.poll()) != null) {
       final CompletableFuture<Void> future = task.future();
       final long id = task.pageId();
       final byte[] data = task.data();
       try {
-        this.accessor.writePage(id, data);
+        accessor.writePage(id, data);
         future.complete(null);
       } catch (final Exception e) {
         future.completeExceptionally(e);

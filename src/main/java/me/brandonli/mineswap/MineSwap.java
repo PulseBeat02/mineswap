@@ -19,6 +19,12 @@ package me.brandonli.mineswap;
 
 import static java.util.Objects.requireNonNull;
 
+import me.brandonli.mineswap.http.HTTPMineSwapServer;
+import me.brandonli.mineswap.page.BlockPagedStore;
+import me.brandonli.mineswap.page.Page;
+import me.brandonli.mineswap.page.accessor.ChunkPageAccessor;
+import me.brandonli.mineswap.page.accessor.PageAccessor;
+import me.brandonli.mineswap.utils.VoidChunkGenerator;
 import org.bukkit.Bukkit;
 import org.bukkit.GameRules;
 import org.bukkit.World;
@@ -28,15 +34,16 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class MineSwap extends JavaPlugin {
 
+  private PageAccessor accessor;
   private HTTPMineSwapServer server;
   private BlockPagedStore store;
   private World swapWorld;
 
   @Override
   public void onEnable() {
-    final NMSChunkAccessor accessor = new NMSChunkAccessor();
+    this.accessor = new ChunkPageAccessor();
     this.swapWorld = this.getOrCreateSwapWorld();
-    this.store = new BlockPagedStore(this, accessor);
+    this.store = new BlockPagedStore(this);
     this.server = new HTTPMineSwapServer(this, this.store);
     this.server.start();
   }
@@ -87,6 +94,10 @@ public final class MineSwap extends JavaPlugin {
     world.setGameRule(GameRules.SPAWN_WARDENS, false);
     world.setAutoSave(true);
     return world;
+  }
+
+  public PageAccessor getPageAccessor() {
+    return this.accessor;
   }
 
   public World getSwapWorld() {

@@ -15,13 +15,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package me.brandonli.mineswap;
+package me.brandonli.mineswap.page.accessor;
 
 import com.google.common.base.Preconditions;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import me.brandonli.mineswap.page.Page;
+import me.brandonli.mineswap.utils.IOUtils;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,7 +37,7 @@ import org.bukkit.World;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.craftbukkit.util.CraftMagicNumbers;
 
-public final class NMSChunkAccessor {
+public final class ChunkPageAccessor implements PageAccessor {
 
   private static final BlockState[] INDEX_TO_PALETTE;
   private static final Map<BlockState, Integer> PALETTE_TO_INDEX;
@@ -55,13 +57,14 @@ public final class NMSChunkAccessor {
 
   private final ServerLevel level;
 
-  public NMSChunkAccessor() {
+  public ChunkPageAccessor() {
     final World world = Bukkit.getWorld(Page.PAGE_WORLD_NAME);
     final CraftWorld craftWorld = (CraftWorld) world;
     Preconditions.checkNotNull(craftWorld, "World cannot be null");
     this.level = craftWorld.getHandle();
   }
 
+  @Override
   public void writePage(final long pageId, final byte[] data) {
     final int chunkIndex = getChunkIndex(pageId);
     final int pageInChunk = getPageInChunk(pageId);
@@ -92,6 +95,7 @@ public final class NMSChunkAccessor {
     this.sendChunkUpdate(chunk);
   }
 
+  @Override
   public byte[] readPage(final long pageId) {
     final int chunkIndex = getChunkIndex(pageId);
     final int pageInChunk = getPageInChunk(pageId);

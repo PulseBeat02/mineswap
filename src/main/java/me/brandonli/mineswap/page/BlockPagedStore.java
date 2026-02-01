@@ -15,23 +15,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package me.brandonli.mineswap;
+package me.brandonli.mineswap.page;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.CompletableFuture;
+import me.brandonli.mineswap.MineSwap;
+import me.brandonli.mineswap.page.accessor.PageAccessor;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitScheduler;
 
 public final class BlockPagedStore {
 
   private final MineSwap plugin;
-  private final NMSChunkAccessor accessor;
   private final ParallelPageQueue writeQueue;
 
-  public BlockPagedStore(final MineSwap plugin, final NMSChunkAccessor accessor) {
+  public BlockPagedStore(final MineSwap plugin) {
     this.plugin = plugin;
-    this.accessor = accessor;
-    this.writeQueue = new ParallelPageQueue(plugin, accessor);
+    this.writeQueue = new ParallelPageQueue(plugin);
   }
 
   public CompletableFuture<Void> queueWritePage(final long pageId, final byte[] data) {
@@ -42,8 +42,9 @@ public final class BlockPagedStore {
   }
 
   public CompletableFuture<byte[]> readPageAsync(final long pageId) {
+    final PageAccessor accessor = this.plugin.getPageAccessor();
     if (Bukkit.isPrimaryThread()) {
-      final byte[] read = this.accessor.readPage(pageId);
+      final byte[] read = accessor.readPage(pageId);
       return CompletableFuture.completedFuture(read);
     }
 
@@ -51,7 +52,7 @@ public final class BlockPagedStore {
     final BukkitScheduler scheduler = Bukkit.getScheduler();
     scheduler.runTask(this.plugin, () -> {
       try {
-        final byte[] result = this.accessor.readPage(pageId);
+        final byte[] result = accessor.readPage(pageId);
         future.complete(result);
       } catch (final Exception e) {
         future.completeExceptionally(e);
