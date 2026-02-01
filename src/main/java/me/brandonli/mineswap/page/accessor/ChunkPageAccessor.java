@@ -17,12 +17,6 @@
  */
 package me.brandonli.mineswap.page.accessor;
 
-import static java.util.Objects.requireNonNull;
-
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import me.brandonli.mineswap.page.Page;
 import me.brandonli.mineswap.utils.IOUtils;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
@@ -38,18 +32,27 @@ import org.bukkit.World;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.craftbukkit.util.CraftMagicNumbers;
 
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import static java.util.Objects.requireNonNull;
+
 public final class ChunkPageAccessor implements PageAccessor {
+
+  private static final int CHUNK_SIZE = 16;
+  private static final int CHUNK_BLOCKS_PER_LAYER = CHUNK_SIZE * CHUNK_SIZE;
+  private static final int LAYERS_PER_PAGE = Page.PAGE_SIZE_BYTES / CHUNK_BLOCKS_PER_LAYER;
+  private static final int MIN_Y = -64;
+  private static final int PAGES_PER_CHUNK = 1;
+  private static final int CHUNKS_PER_ROW = 128;
 
   private static final BlockState[] INDEX_TO_PALETTE;
   private static final Map<BlockState, Integer> PALETTE_TO_INDEX;
 
   static {
-    INDEX_TO_PALETTE = IOUtils.getLinesFromResource("palette.txt").stream()
-        .map(Material::valueOf)
-        .map(CraftMagicNumbers::getBlock)
-        .filter(Objects::nonNull)
-        .map(net.minecraft.world.level.block.Block::defaultBlockState)
-        .toArray(BlockState[]::new);
+    INDEX_TO_PALETTE = IOUtils.getLinesFromResource("palette.txt").stream().map(Material::valueOf).map(CraftMagicNumbers::getBlock).filter(Objects::nonNull).map(net.minecraft.world.level.block.Block::defaultBlockState).toArray(BlockState[]::new);
     PALETTE_TO_INDEX = new IdentityHashMap<>(INDEX_TO_PALETTE.length);
     for (int i = 0; i < INDEX_TO_PALETTE.length; i++) {
       PALETTE_TO_INDEX.put(INDEX_TO_PALETTE[i], i);
@@ -77,9 +80,9 @@ public final class ChunkPageAccessor implements PageAccessor {
     final LevelChunkSection[] sections = chunk.getSections();
     for (int i = 0; i < data.length; i++) {
       final int v = data[i] & 0xFF;
-      final int localX = i % Page.CHUNK_SIZE;
-      final int localZ = (i / Page.CHUNK_SIZE) % Page.CHUNK_SIZE;
-      final int layerInPage = i / Page.CHUNK_BLOCKS_PER_LAYER;
+      final int localX = i % CHUNK_SIZE;
+      final int localZ = (i / CHUNK_SIZE) % CHUNK_SIZE;
+      final int layerInPage = i / CHUNK_BLOCKS_PER_LAYER;
       final int y = baseY + layerInPage;
       final int sectionIndex = this.level.getSectionIndex(y);
       if (sectionIndex < 0 || sectionIndex >= sections.length) {
@@ -108,9 +111,9 @@ public final class ChunkPageAccessor implements PageAccessor {
     final LevelChunkSection[] sections = chunk.getSections();
     final byte[] out = new byte[Page.PAGE_SIZE_BYTES];
     for (int i = 0; i < out.length; i++) {
-      final int localX = i % Page.CHUNK_SIZE;
-      final int localZ = (i / Page.CHUNK_SIZE) % Page.CHUNK_SIZE;
-      final int layerInPage = i / Page.CHUNK_BLOCKS_PER_LAYER;
+      final int localX = i % CHUNK_SIZE;
+      final int localZ = (i / CHUNK_SIZE) % CHUNK_SIZE;
+      final int layerInPage = i / CHUNK_BLOCKS_PER_LAYER;
       final int y = baseY + layerInPage;
       final int sectionIndex = this.level.getSectionIndex(y);
       if (sectionIndex < 0 || sectionIndex >= sections.length) {
@@ -134,28 +137,27 @@ public final class ChunkPageAccessor implements PageAccessor {
     }
 
     final LevelLightEngine lightEngine = this.level.getLightEngine();
-    final ClientboundLevelChunkWithLightPacket packet =
-        new ClientboundLevelChunkWithLightPacket(chunk, lightEngine, null, null, true);
+    final ClientboundLevelChunkWithLightPacket packet = new ClientboundLevelChunkWithLightPacket(chunk, lightEngine, null, null, true);
     players.forEach(player -> player.connection.send(packet));
   }
 
   private static int getChunkIndex(final long pageId) {
-    return (int) (pageId / Page.PAGES_PER_CHUNK);
+    return (int) (pageId / PAGES_PER_CHUNK);
   }
 
   private static int getPageInChunk(final long pageId) {
-    return (int) (pageId % Page.PAGES_PER_CHUNK);
+    return (int) (pageId % PAGES_PER_CHUNK);
   }
 
   private static int getChunkX(final int chunkIndex) {
-    return (chunkIndex % Page.CHUNKS_PER_ROW) * Page.CHUNK_SIZE;
+    return (chunkIndex % CHUNKS_PER_ROW) * CHUNK_SIZE;
   }
 
   private static int getChunkZ(final int chunkIndex) {
-    return (chunkIndex / Page.CHUNKS_PER_ROW) * Page.CHUNK_SIZE;
+    return (chunkIndex / CHUNKS_PER_ROW) * CHUNK_SIZE;
   }
 
   private static int getBaseY(final int pageInChunk) {
-    return Page.MIN_Y + (pageInChunk * Page.LAYERS_PER_PAGE);
+    return MIN_Y + (pageInChunk * LAYERS_PER_PAGE);
   }
 }
