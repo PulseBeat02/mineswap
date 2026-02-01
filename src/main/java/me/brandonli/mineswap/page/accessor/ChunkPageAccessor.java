@@ -17,7 +17,8 @@
  */
 package me.brandonli.mineswap.page.accessor;
 
-import com.google.common.base.Preconditions;
+import static java.util.Objects.requireNonNull;
+
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,9 +59,8 @@ public final class ChunkPageAccessor implements PageAccessor {
   private final ServerLevel level;
 
   public ChunkPageAccessor() {
-    final World world = Bukkit.getWorld(Page.PAGE_WORLD_NAME);
+    final World world = requireNonNull(Bukkit.getWorld(Page.PAGE_WORLD_NAME));
     final CraftWorld craftWorld = (CraftWorld) world;
-    Preconditions.checkNotNull(craftWorld, "World cannot be null");
     this.level = craftWorld.getHandle();
   }
 

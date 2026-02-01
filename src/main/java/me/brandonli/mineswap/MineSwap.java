@@ -41,10 +41,10 @@ public final class MineSwap extends JavaPlugin {
 
   @Override
   public void onEnable() {
-    this.accessor = new ChunkPageAccessor();
     this.swapWorld = this.getOrCreateSwapWorld();
     this.store = new BlockPagedStore(this);
     this.server = new HTTPMineSwapServer(this, this.store);
+    this.accessor = new ChunkPageAccessor();
     this.server.start();
   }
 

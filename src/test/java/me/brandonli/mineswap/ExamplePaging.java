@@ -27,7 +27,7 @@ public final class ExamplePaging {
   private static final int NUM_ELEMENTS = 5_000_000;
   private static final long MEMORY_SIZE = (long) NUM_ELEMENTS * 4 + 1024;
 
-  public static void main(final String[] args) {
+  static void main(final String[] args) {
     System.out.println("MineSwap Sort Demo - Sorting " + NUM_ELEMENTS + " integers in Minecraft!");
     System.out.println("Memory required: " + (MEMORY_SIZE / 1024 / 1024) + " MB");
     System.out.println("Pages required: " + (MEMORY_SIZE / Page.PAGE_SIZE_BYTES + 1));
