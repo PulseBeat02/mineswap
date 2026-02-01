@@ -20,7 +20,7 @@ package me.brandonli.mineswap;
 public interface Page {
   int PAGE_PORT = 8080;
   int PAGE_SIZE = 4096;
-  int BLOCKS_PER_TICK = 50000;
+  int BLOCKS_PER_TICK = 100000;
   int PAGE_SIZE_BYTES = 4096;
 
   int CHUNK_SIZE = 16;

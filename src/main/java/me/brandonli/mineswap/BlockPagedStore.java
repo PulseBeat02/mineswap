@@ -23,22 +23,21 @@ import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockType;
-import org.bukkit.Material;
-
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.bukkit.Material;
 
 public final class BlockPagedStore {
 
   private static final BlockType[] PALETTE = IOUtils.getLinesFromResource("palette.txt").stream()
-          .map(Material::valueOf)
-          .map(BukkitAdapter::asBlockType)
-          .filter(Objects::nonNull)
-          .toArray(BlockType[]::new);
+      .map(Material::valueOf)
+      .map(BukkitAdapter::asBlockType)
+      .filter(Objects::nonNull)
+      .toArray(BlockType[]::new);
   private static final Map<BlockType, Integer> INDEX_PALETTE = Arrays.stream(PALETTE)
-          .collect(Collectors.toMap(type -> type, type -> Arrays.asList(PALETTE).indexOf(type)));
+      .collect(Collectors.toMap(type -> type, type -> Arrays.asList(PALETTE).indexOf(type)));
 
   private final MineSwap plugin;
   private final BlockTransactionQueue queue;
@@ -70,8 +69,8 @@ public final class BlockPagedStore {
 
   public void queueWritePage(final long pageId, final byte[] data) {
     Preconditions.checkArgument(
-            data.length == Page.PAGE_SIZE_BYTES,
-            "Expected " + Page.PAGE_SIZE_BYTES + " bytes, got " + data.length);
+        data.length == Page.PAGE_SIZE_BYTES,
+        "Expected " + Page.PAGE_SIZE_BYTES + " bytes, got " + data.length);
     final int chunkIndex = this.getChunkIndex(pageId);
     final int pageInChunk = this.getPageInChunk(pageId);
     final int chunkX = this.getChunkX(chunkIndex);
@@ -86,7 +85,8 @@ public final class BlockPagedStore {
       final int y = baseY + localY;
       final int z = chunkZ + localZ;
       final BlockType type = PALETTE[v];
-      final BlockWorldTransaction transaction = new BlockWorldTransaction(type, x, y, z, chunkIndex);
+      final BlockWorldTransaction transaction =
+          new BlockWorldTransaction(type, x, y, z, chunkIndex);
       this.queue.enqueue(transaction);
     }
   }

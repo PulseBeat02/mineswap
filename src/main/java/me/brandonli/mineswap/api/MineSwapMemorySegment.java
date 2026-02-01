@@ -20,13 +20,18 @@ package me.brandonli.mineswap.api;
 import java.io.Serial;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import me.brandonli.mineswap.Page;
 
 public final class MineSwapMemorySegment implements MemorySegment {
 
   private final LinkedHashMap<Long, PageFrame> cache;
+  private final ConcurrentHashMap<Long, CompletableFuture<byte[]>> prefetchQueue;
   private final MineSwapClient client;
   private final long sizeBytes;
   private final int maxPages;
@@ -47,14 +52,14 @@ public final class MineSwapMemorySegment implements MemorySegment {
       }
       final long key = eldest.getKey();
       final PageFrame value = eldest.getValue();
-      MineSwapMemorySegment.this.flush(key, value);
+      MineSwapMemorySegment.this.flushAsync(key, value);
       return true;
     }
   }
 
   private static final class PageFrame {
     private final byte[] data;
-    private boolean dirty;
+    private volatile boolean dirty;
 
     PageFrame(final byte[] data) {
       this.data = data;
@@ -67,6 +72,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
     this.sizeBytes = sizeBytes;
     this.maxPages = maxCachedPages;
     this.cache = new CacheMap();
+    this.prefetchQueue = new ConcurrentHashMap<>();
   }
 
   private PageFrame page(final long pageId) {
@@ -74,32 +80,57 @@ public final class MineSwapMemorySegment implements MemorySegment {
     if (frame != null) {
       return frame;
     }
-    final byte[] data = this.client.readPage(pageId);
+    final CompletableFuture<byte[]> prefetched = this.prefetchQueue.remove(pageId);
+    final byte[] data = prefetched != null ? prefetched.join() : this.client.readPage(pageId);
     frame = new PageFrame(data);
     this.cache.put(pageId, frame);
+    this.prefetchAhead(pageId);
     return frame;
+  }
+
+  private void prefetchAhead(final long currentPageId) {
+    for (int i = 1; i <= 4; i++) {
+      final long nextPageId = currentPageId + i;
+      if (!this.cache.containsKey(nextPageId) && !this.prefetchQueue.containsKey(nextPageId)) {
+        final CompletableFuture<byte[]> future = this.client.readPageAsync(nextPageId);
+        this.prefetchQueue.put(nextPageId, future);
+      }
+    }
   }
 
   private void flush(final long id, final PageFrame frame) {
     if (!frame.dirty) {
       return;
     }
-    try {
-      this.client.writePage(id, frame.data);
-      frame.dirty = false;
-    } catch (final Exception e) {
-      throw new RuntimeException(e);
+    this.client.writePage(id, frame.data);
+    frame.dirty = false;
+  }
+
+  private void flushAsync(final long id, final PageFrame frame) {
+    if (!frame.dirty) {
+      return;
     }
+    this.client.writePageAsync(id, frame.data).thenRun(() -> frame.dirty = false);
   }
 
   @Override
   public void flushAll() {
-    this.cache.forEach(this::flush);
+    final List<CompletableFuture<Void>> futures = new ArrayList<>();
+    for (final Map.Entry<Long, PageFrame> entry : this.cache.entrySet()) {
+      final PageFrame frame = entry.getValue();
+      if (frame.dirty) {
+        futures.add(this.client
+            .writePageAsync(entry.getKey(), frame.data)
+            .thenRun(() -> frame.dirty = false));
+      }
+    }
+    CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
   }
 
   @Override
   public void close() {
     this.flushAll();
+    this.client.close();
   }
 
   private void check(final long address, final int bytes) {
@@ -176,7 +207,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
     return this.pageId(address) != this.pageId(address + bytes - 1);
   }
 
-  private byte[] readBytes(final long address, final int count) {
+  private byte[] readBytesRaw(final long address, final int count) {
     final byte[] result = new byte[count];
     for (int i = 0; i < count; i++) {
       result[i] = this.getByte(address + i);
@@ -184,7 +215,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
     return result;
   }
 
-  private void writeBytes(final long address, final byte[] bytes) {
+  private void writeBytesRaw(final long address, final byte[] bytes) {
     for (int i = 0; i < bytes.length; i++) {
       this.setByte(address + i, bytes[i]);
     }
@@ -194,7 +225,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
   public int getInt(final long address) {
     this.check(address, 4);
     if (this.crossesPageBoundary(address, 4)) {
-      return ByteBuffer.wrap(this.readBytes(address, 4))
+      return ByteBuffer.wrap(this.readBytesRaw(address, 4))
           .order(ByteOrder.LITTLE_ENDIAN)
           .getInt();
     }
@@ -208,7 +239,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
     if (this.crossesPageBoundary(address, 4)) {
       final byte[] bytes = new byte[4];
       ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putInt(value);
-      this.writeBytes(address, bytes);
+      this.writeBytesRaw(address, bytes);
       return;
     }
     final PageFrame frame = this.page(this.pageId(address));
@@ -220,7 +251,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
   public char getChar(final long address) {
     this.check(address, 2);
     if (this.crossesPageBoundary(address, 2)) {
-      return ByteBuffer.wrap(this.readBytes(address, 2))
+      return ByteBuffer.wrap(this.readBytesRaw(address, 2))
           .order(ByteOrder.LITTLE_ENDIAN)
           .getChar();
     }
@@ -234,7 +265,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
     if (this.crossesPageBoundary(address, 2)) {
       final byte[] bytes = new byte[2];
       ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putChar(value);
-      this.writeBytes(address, bytes);
+      this.writeBytesRaw(address, bytes);
       return;
     }
     final PageFrame frame = this.page(this.pageId(address));
@@ -246,7 +277,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
   public long getLong(final long address) {
     this.check(address, 8);
     if (this.crossesPageBoundary(address, 8)) {
-      return ByteBuffer.wrap(this.readBytes(address, 8))
+      return ByteBuffer.wrap(this.readBytesRaw(address, 8))
           .order(ByteOrder.LITTLE_ENDIAN)
           .getLong();
     }
@@ -260,7 +291,7 @@ public final class MineSwapMemorySegment implements MemorySegment {
     if (this.crossesPageBoundary(address, 8)) {
       final byte[] bytes = new byte[8];
       ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putLong(value);
-      this.writeBytes(address, bytes);
+      this.writeBytesRaw(address, bytes);
       return;
     }
     final PageFrame frame = this.page(this.pageId(address));

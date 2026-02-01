@@ -38,6 +38,7 @@ public final class MineSwap extends JavaPlugin {
     final WorldEdit worldEdit = WorldEdit.getInstance();
     final EditSession session = worldEdit.newEditSession(wrapped);
     session.setFastMode(true);
+    session.setBatchingChunks(true);
     return session;
   }
 

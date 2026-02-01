@@ -21,13 +21,12 @@ import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.MaxChangedBlocksException;
 import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockType;
-import org.checkerframework.checker.initialization.qual.UnderInitialization;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import org.checkerframework.checker.initialization.qual.UnderInitialization;
 
 public final class BlockTransactionQueue implements TransactionQueue {
 
@@ -49,40 +48,52 @@ public final class BlockTransactionQueue implements TransactionQueue {
   private ExecutorService createExecutor(@UnderInitialization BlockTransactionQueue this) {
     final Runtime runtime = Runtime.getRuntime();
     final int coreCount = runtime.availableProcessors();
-    return Executors.newFixedThreadPool(coreCount);
+    return Executors.newWorkStealingPool(coreCount * 2);
   }
 
   private void startAsyncProcessing() {
-    final Thread thread = new Thread(this::processLoop, "MineSwap-Processor");
-    thread.setDaemon(true);
-    thread.start();
+    for (int i = 0; i < Runtime.getRuntime().availableProcessors(); i++) {
+      final Thread thread = new Thread(this::processLoop, "MineSwap-Processor-" + i);
+      thread.setDaemon(true);
+      thread.start();
+    }
   }
 
   private void processLoop() {
     while (this.running) {
       try {
-        if (!this.available.tryAcquire(100, TimeUnit.MILLISECONDS)) {
+        if (!this.available.tryAcquire(50, TimeUnit.MILLISECONDS)) {
           continue;
         }
 
-        final Map<Integer, List<WorldTransaction>> chunkBatches = new HashMap<>();
+        final Map<Long, List<WorldTransaction>> chunkBatches = new HashMap<>();
         int totalCount = 0;
         WorldTransaction transaction;
+
         while (totalCount < Page.BLOCKS_PER_TICK && (transaction = this.queue.poll()) != null) {
           this.available.tryAcquire();
-          final int chunkIndex = transaction.getChunkIndex();
-          chunkBatches.computeIfAbsent(chunkIndex, k -> new ArrayList<>()).add(transaction);
+          final long chunkKey = getChunkKey(transaction);
+          chunkBatches.computeIfAbsent(chunkKey, k -> new ArrayList<>(4096)).add(transaction);
           totalCount++;
         }
 
-        for (final List<WorldTransaction> chunkBatch : chunkBatches.values()) {
-          this.executor.submit(() -> this.processBatch(chunkBatch));
+        final List<CompletableFuture<Void>> futures = new ArrayList<>(chunkBatches.size());
+        for (final Map.Entry<Long, List<WorldTransaction>> entry : chunkBatches.entrySet()) {
+          futures.add(
+              CompletableFuture.runAsync(() -> this.processBatch(entry.getValue()), this.executor));
         }
+        CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
       } catch (final InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
       }
     }
+  }
+
+  private static long getChunkKey(final WorldTransaction tx) {
+    final int chunkX = tx.getX() >> 4;
+    final int chunkZ = tx.getZ() >> 4;
+    return ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
   }
 
   private void processBatch(final List<WorldTransaction> batch) {
@@ -112,8 +123,7 @@ public final class BlockTransactionQueue implements TransactionQueue {
         this.executor.shutdownNow();
       }
     } catch (final InterruptedException e) {
-      final Thread thread = Thread.currentThread();
-      thread.interrupt();
+      Thread.currentThread().interrupt();
     }
   }
 

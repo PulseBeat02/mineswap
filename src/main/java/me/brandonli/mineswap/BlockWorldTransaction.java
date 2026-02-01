@@ -27,7 +27,8 @@ public final class BlockWorldTransaction implements WorldTransaction {
   private final int z;
   private final int chunkIndex;
 
-  public BlockWorldTransaction(final BlockType material, final int x, final int y, final int z, final int chunkIndex) {
+  public BlockWorldTransaction(
+      final BlockType material, final int x, final int y, final int z, final int chunkIndex) {
     this.material = material;
     this.x = x;
     this.y = y;
