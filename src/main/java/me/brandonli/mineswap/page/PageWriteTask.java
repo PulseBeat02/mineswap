@@ -20,8 +20,4 @@ package me.brandonli.mineswap.page;
 import java.util.concurrent.CompletableFuture;
 
 public record PageWriteTask(long pageId, byte[] data, CompletableFuture<Void> future) {
-
-  public int getChunkIndex() {
-    return (int) (this.pageId / Page.PAGES_PER_CHUNK);
-  }
 }
