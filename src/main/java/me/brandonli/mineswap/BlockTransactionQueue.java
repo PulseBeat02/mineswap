@@ -34,6 +34,10 @@ public final class BlockTransactionQueue implements TransactionQueue {
       this.setBlock();
       n++;
     }
+    if (n > 0) {
+      final EditSession session = this.plugin.getSession();
+      session.flushSession();
+    }
   }
 
   private void setBlock() {
