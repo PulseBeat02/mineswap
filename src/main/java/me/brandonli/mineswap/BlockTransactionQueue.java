@@ -24,7 +24,9 @@ import com.sk89q.worldedit.world.block.BlockType;
 import org.checkerframework.checker.initialization.qual.UnderInitialization;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public final class BlockTransactionQueue implements TransactionQueue {
@@ -63,14 +65,19 @@ public final class BlockTransactionQueue implements TransactionQueue {
           continue;
         }
 
-        final List<WorldTransaction> batch = new ArrayList<>(Page.BLOCKS_PER_TICK);
+        final Map<Integer, List<WorldTransaction>> chunkBatches = new HashMap<>();
+        int totalCount = 0;
         WorldTransaction transaction;
-        while (batch.size() < Page.BLOCKS_PER_TICK && (transaction = this.queue.poll()) != null) {
+        while (totalCount < Page.BLOCKS_PER_TICK && (transaction = this.queue.poll()) != null) {
           this.available.tryAcquire();
-          batch.add(transaction);
+          final int chunkIndex = transaction.getChunkIndex();
+          chunkBatches.computeIfAbsent(chunkIndex, k -> new ArrayList<>()).add(transaction);
+          totalCount++;
         }
 
-        this.executor.submit(() -> this.processBatch(batch));
+        for (final List<WorldTransaction> chunkBatch : chunkBatches.values()) {
+          this.executor.submit(() -> this.processBatch(chunkBatch));
+        }
       } catch (final InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
@@ -79,6 +86,9 @@ public final class BlockTransactionQueue implements TransactionQueue {
   }
 
   private void processBatch(final List<WorldTransaction> batch) {
+    if (batch.isEmpty()) {
+      return;
+    }
     try (final EditSession session = this.plugin.createEditSession()) {
       for (final WorldTransaction transaction : batch) {
         final int x = transaction.getX();

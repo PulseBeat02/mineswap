@@ -27,5 +27,7 @@ public interface WorldTransaction {
 
   int getZ();
 
+  int getChunkIndex();
+
   BlockType getMaterial();
 }

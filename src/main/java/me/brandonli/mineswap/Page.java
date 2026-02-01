@@ -20,14 +20,15 @@ package me.brandonli.mineswap;
 public interface Page {
   int PAGE_PORT = 8080;
   int PAGE_SIZE = 4096;
-  int BLOCKS_PER_TICK = 10000;
-  int BASE_X = 0;
-  int BASE_Y = 100;
-  int BASE_Z = 0;
-  int PAGES_PER_ROW = 8;
+  int BLOCKS_PER_TICK = 50000;
   int PAGE_SIZE_BYTES = 4096;
-  int GAP_X = 2;
-  int GAP_Z = 2;
-  int PAGE_WIDTH = 128;
-  int PAGE_HEIGHT = PAGE_SIZE_BYTES / PAGE_WIDTH;
+
+  int CHUNK_SIZE = 16;
+  int CHUNK_BLOCKS_PER_LAYER = CHUNK_SIZE * CHUNK_SIZE;
+  int LAYERS_PER_PAGE = PAGE_SIZE_BYTES / CHUNK_BLOCKS_PER_LAYER;
+  int MIN_Y = -64;
+  int MAX_Y = 319;
+  int WORLD_HEIGHT = MAX_Y - MIN_Y + 1;
+  int PAGES_PER_CHUNK = WORLD_HEIGHT / LAYERS_PER_PAGE;
+  int CHUNKS_PER_ROW = 16;
 }

@@ -25,12 +25,14 @@ public final class BlockWorldTransaction implements WorldTransaction {
   private final int x;
   private final int y;
   private final int z;
+  private final int chunkIndex;
 
-  public BlockWorldTransaction(final BlockType material, final int x, final int y, final int z) {
+  public BlockWorldTransaction(final BlockType material, final int x, final int y, final int z, final int chunkIndex) {
     this.material = material;
     this.x = x;
     this.y = y;
     this.z = z;
+    this.chunkIndex = chunkIndex;
   }
 
   @Override
@@ -46,6 +48,11 @@ public final class BlockWorldTransaction implements WorldTransaction {
   @Override
   public int getZ() {
     return this.z;
+  }
+
+  @Override
+  public int getChunkIndex() {
+    return this.chunkIndex;
   }
 
   @Override
