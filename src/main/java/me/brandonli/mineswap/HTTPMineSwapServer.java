@@ -10,6 +10,7 @@ import org.bukkit.scheduler.BukkitScheduler;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.OptionalInt;
+import java.util.concurrent.CompletableFuture;
 
 import static java.util.Objects.requireNonNull;
 
@@ -30,7 +31,7 @@ public final class HTTPMineSwapServer implements MineSwapServer {
     final Javalin app = Javalin.create().start(Page.PAGE_PORT);
     app.get("/", this::handleDefaultMessage);
     app.get("/page", this::handlePageGet);
-    app.post("/page", this::handlePagePost);
+    app.put("/page", this::handlePagePut);
     this.app = app;
   }
 
@@ -45,7 +46,7 @@ public final class HTTPMineSwapServer implements MineSwapServer {
     context.result(RUNNING_MESSAGE);
   }
 
-  private void handlePagePost(final Context context) {
+  private void handlePagePut(final Context context) {
     final OptionalInt optionalId = this.validatePageId(context);
     if (optionalId.isEmpty()) {
       return;
@@ -66,11 +67,13 @@ public final class HTTPMineSwapServer implements MineSwapServer {
       return;
     }
 
+    final CompletableFuture<String> future = new CompletableFuture<>();
     final BukkitScheduler scheduler = Bukkit.getScheduler();
     scheduler.runTask(this.plugin, () -> {
       this.store.queueWritePage(id, res);
-      context.status(HttpStatus.OK);
+      future.complete("OK");
     });
+    context.future(() -> future.thenAccept(_ -> context.status(HttpStatus.OK)));
   }
 
   private void handlePageGet(final Context context) {
@@ -80,12 +83,14 @@ public final class HTTPMineSwapServer implements MineSwapServer {
     }
 
     final int id = optionalId.getAsInt();
+    final CompletableFuture<String> future = new CompletableFuture<>();
     final BukkitScheduler scheduler = Bukkit.getScheduler();
     scheduler.runTask(this.plugin, () -> {
       final byte[] result = this.store.readPage(id);
       final String base64 = IOUtils.encodeIntoBase64(result);
-      context.result(base64);
+      future.complete(base64);
     });
+    context.future(() -> future.thenAccept(context::result));
   }
 
   private OptionalInt validatePageId(final Context context) {

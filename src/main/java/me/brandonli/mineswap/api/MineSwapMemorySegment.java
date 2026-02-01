@@ -115,14 +115,41 @@ public final class MineSwapMemorySegment implements AutoCloseable {
     return ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
   }
 
+  private boolean crossesPageBoundary(final long address, final int bytes) {
+    return this.pageId(address) != this.pageId(address + bytes - 1);
+  }
+
+  private byte[] readBytes(final long address, final int count) {
+    final byte[] result = new byte[count];
+    for (int i = 0; i < count; i++) {
+      result[i] = this.getByte(address + i);
+    }
+    return result;
+  }
+
+  private void writeBytes(final long address, final byte[] bytes) {
+    for (int i = 0; i < bytes.length; i++) {
+      this.setByte(address + i, bytes[i]);
+    }
+  }
+
   public int getInt(final long address) {
     this.check(address, 4);
+    if (this.crossesPageBoundary(address, 4)) {
+      return ByteBuffer.wrap(this.readBytes(address, 4)).order(ByteOrder.LITTLE_ENDIAN).getInt();
+    }
     final PageFrame frame = this.page(this.pageId(address));
     return this.buf(frame.data).getInt(this.offset(address));
   }
 
   public void setInt(final long address, final int value) {
     this.check(address, 4);
+    if (this.crossesPageBoundary(address, 4)) {
+      final byte[] bytes = new byte[4];
+      ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putInt(value);
+      this.writeBytes(address, bytes);
+      return;
+    }
     final PageFrame frame = this.page(this.pageId(address));
     this.buf(frame.data).putInt(this.offset(address), value);
     frame.dirty = true;
@@ -130,12 +157,21 @@ public final class MineSwapMemorySegment implements AutoCloseable {
 
   public char getChar(final long address) {
     this.check(address, 2);
+    if (this.crossesPageBoundary(address, 2)) {
+      return ByteBuffer.wrap(this.readBytes(address, 2)).order(ByteOrder.LITTLE_ENDIAN).getChar();
+    }
     final PageFrame frame = this.page(this.pageId(address));
     return this.buf(frame.data).getChar(this.offset(address));
   }
 
   public void setChar(final long address, final char value) {
     this.check(address, 2);
+    if (this.crossesPageBoundary(address, 2)) {
+      final byte[] bytes = new byte[2];
+      ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putChar(value);
+      this.writeBytes(address, bytes);
+      return;
+    }
     final PageFrame frame = this.page(this.pageId(address));
     this.buf(frame.data).putChar(this.offset(address), value);
     frame.dirty = true;
@@ -143,12 +179,21 @@ public final class MineSwapMemorySegment implements AutoCloseable {
 
   public long getLong(final long address) {
     this.check(address, 8);
+    if (this.crossesPageBoundary(address, 8)) {
+      return ByteBuffer.wrap(this.readBytes(address, 8)).order(ByteOrder.LITTLE_ENDIAN).getLong();
+    }
     final PageFrame frame = this.page(this.pageId(address));
     return this.buf(frame.data).getLong(this.offset(address));
   }
 
   public void setLong(final long address, final long value) {
     this.check(address, 8);
+    if (this.crossesPageBoundary(address, 8)) {
+      final byte[] bytes = new byte[8];
+      ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putLong(value);
+      this.writeBytes(address, bytes);
+      return;
+    }
     final PageFrame frame = this.page(this.pageId(address));
     this.buf(frame.data).putLong(this.offset(address), value);
     frame.dirty = true;
