@@ -1,16 +1,33 @@
+/*
+ * This file is part of MineSwap, a poor guy's RAM alternative
+ * Copyright (C) Brandon Li <https://brandonli.me/>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package me.brandonli.mineswap;
 
-import me.brandonli.mineswap.api.MemorySegment;
-import me.brandonli.mineswap.api.MineSwapClient;
-import me.brandonli.mineswap.api.MineSwapMemorySegment;
-
-import javax.imageio.ImageIO;
-import javax.swing.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import me.brandonli.mineswap.api.MemorySegment;
+import me.brandonli.mineswap.api.MineSwapClient;
+import me.brandonli.mineswap.api.MineSwapMemorySegment;
 
 public final class ExamplePaging {
 
@@ -18,28 +35,22 @@ public final class ExamplePaging {
     final Path imagePath = Path.of("rgb.png");
     final byte[] originalBytes = Files.readAllBytes(imagePath);
     final MineSwapClient client = new MineSwapClient("http://localhost:8080");
-    try (final MemorySegment mem = new MineSwapMemorySegment(client, 64L * 1024 * 1024, 64)) {
+    try (final MemorySegment mem = new MineSwapMemorySegment(client, 64L * 1024 * 1024, 128)) {
 
+      final long writeStart = System.currentTimeMillis();
       mem.setInt(0, originalBytes.length);
-      for (int i = 0; i < originalBytes.length; i++) {
-        mem.setByte(4 + i, originalBytes[i]);
-      }
+      mem.setBytes(4, originalBytes);
+      final long writeEnd = System.currentTimeMillis();
+      System.out.println("Write: " + (writeEnd - writeStart) + "ms");
 
+      final long readStart = System.currentTimeMillis();
       final int storedLength = mem.getInt(0);
-      final byte[] readBytes = new byte[storedLength];
-      for (int i = 0; i < storedLength; i++) {
-        readBytes[i] = mem.getByte(4 + i);
-      }
+      final byte[] readBytes = mem.getBytes(4, storedLength);
+      final long readEnd = System.currentTimeMillis();
+      System.out.println("Read: " + (readEnd - readStart) + "ms");
 
-      boolean match = originalBytes.length == readBytes.length;
-      if (match) {
-        for (int i = 0; i < originalBytes.length; i++) {
-          if (originalBytes[i] != readBytes[i]) {
-            match = false;
-            break;
-          }
-        }
-      }
+      final boolean match = Arrays.equals(originalBytes, readBytes);
+      System.out.println("Equal: " + (match ? "PASSED" : "FAILED"));
 
       final ByteArrayInputStream bais = new ByteArrayInputStream(readBytes);
       final BufferedImage image = ImageIO.read(bais);

@@ -27,8 +27,9 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    compileOnly("com.sk89q.worldedit:worldedit-core:7.3.17")
-    compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.3.17")
+    compileOnly("com.fastasyncworldedit:FastAsyncWorldEdit-Core")
+    compileOnly("com.fastasyncworldedit:FastAsyncWorldEdit-Bukkit") { isTransitive = false }
+    implementation(platform("com.intellectualsites.bom:bom-newest:1.55"))
     implementation("io.javalin:javalin:6.7.0")
     testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
 }
@@ -97,7 +98,7 @@ tasks {
 
     runServer {
         downloadPlugins {
-            url("https://cdn.modrinth.com/data/1u6JkXh5/versions/CkT32vix/worldedit-bukkit-7.4.0.jar")
+            url("https://cdn.modrinth.com/data/z4HZZnLr/versions/MOe9fY3h/FastAsyncWorldEdit-Bukkit-2.15.0.jar")
         }
         minecraftVersion("1.21.11")
     }

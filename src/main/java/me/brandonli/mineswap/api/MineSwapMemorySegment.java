@@ -1,12 +1,28 @@
+/*
+ * This file is part of MineSwap, a poor guy's RAM alternative
+ * Copyright (C) Brandon Li <https://brandonli.me/>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package me.brandonli.mineswap.api;
-
-import me.brandonli.mineswap.Page;
 
 import java.io.Serial;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import me.brandonli.mineswap.Page;
 
 public final class MineSwapMemorySegment implements MemorySegment {
 
@@ -45,7 +61,8 @@ public final class MineSwapMemorySegment implements MemorySegment {
     }
   }
 
-  public MineSwapMemorySegment(final MineSwapClient client, final long sizeBytes, final int maxCachedPages) {
+  public MineSwapMemorySegment(
+      final MineSwapClient client, final long sizeBytes, final int maxCachedPages) {
     this.client = client;
     this.sizeBytes = sizeBytes;
     this.maxPages = maxCachedPages;
@@ -114,6 +131,43 @@ public final class MineSwapMemorySegment implements MemorySegment {
     frame.dirty = true;
   }
 
+  @Override
+  public byte[] getBytes(final long address, final int length) {
+    this.check(address, length);
+    final byte[] result = new byte[length];
+    int remaining = length;
+    int destOffset = 0;
+    long currentAddr = address;
+    while (remaining > 0) {
+      final PageFrame frame = this.page(this.pageId(currentAddr));
+      final int pageOffset = this.offset(currentAddr);
+      final int bytesInPage = Math.min(remaining, Page.PAGE_SIZE_BYTES - pageOffset);
+      System.arraycopy(frame.data, pageOffset, result, destOffset, bytesInPage);
+      remaining -= bytesInPage;
+      destOffset += bytesInPage;
+      currentAddr += bytesInPage;
+    }
+    return result;
+  }
+
+  @Override
+  public void setBytes(final long address, final byte[] data) {
+    this.check(address, data.length);
+    int remaining = data.length;
+    int srcOffset = 0;
+    long currentAddr = address;
+    while (remaining > 0) {
+      final PageFrame frame = this.page(this.pageId(currentAddr));
+      final int pageOffset = this.offset(currentAddr);
+      final int bytesInPage = Math.min(remaining, Page.PAGE_SIZE_BYTES - pageOffset);
+      System.arraycopy(data, srcOffset, frame.data, pageOffset, bytesInPage);
+      frame.dirty = true;
+      remaining -= bytesInPage;
+      srcOffset += bytesInPage;
+      currentAddr += bytesInPage;
+    }
+  }
+
   private ByteBuffer buf(final byte[] data) {
     return ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
   }
@@ -140,7 +194,9 @@ public final class MineSwapMemorySegment implements MemorySegment {
   public int getInt(final long address) {
     this.check(address, 4);
     if (this.crossesPageBoundary(address, 4)) {
-      return ByteBuffer.wrap(this.readBytes(address, 4)).order(ByteOrder.LITTLE_ENDIAN).getInt();
+      return ByteBuffer.wrap(this.readBytes(address, 4))
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .getInt();
     }
     final PageFrame frame = this.page(this.pageId(address));
     return this.buf(frame.data).getInt(this.offset(address));
@@ -164,7 +220,9 @@ public final class MineSwapMemorySegment implements MemorySegment {
   public char getChar(final long address) {
     this.check(address, 2);
     if (this.crossesPageBoundary(address, 2)) {
-      return ByteBuffer.wrap(this.readBytes(address, 2)).order(ByteOrder.LITTLE_ENDIAN).getChar();
+      return ByteBuffer.wrap(this.readBytes(address, 2))
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .getChar();
     }
     final PageFrame frame = this.page(this.pageId(address));
     return this.buf(frame.data).getChar(this.offset(address));
@@ -188,7 +246,9 @@ public final class MineSwapMemorySegment implements MemorySegment {
   public long getLong(final long address) {
     this.check(address, 8);
     if (this.crossesPageBoundary(address, 8)) {
-      return ByteBuffer.wrap(this.readBytes(address, 8)).order(ByteOrder.LITTLE_ENDIAN).getLong();
+      return ByteBuffer.wrap(this.readBytes(address, 8))
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .getLong();
     }
     final PageFrame frame = this.page(this.pageId(address));
     return this.buf(frame.data).getLong(this.offset(address));

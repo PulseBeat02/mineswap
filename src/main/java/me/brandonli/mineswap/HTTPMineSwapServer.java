@@ -1,29 +1,47 @@
+/*
+ * This file is part of MineSwap, a poor guy's RAM alternative
+ * Copyright (C) Brandon Li <https://brandonli.me/>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package me.brandonli.mineswap;
+
+import static java.util.Objects.requireNonNull;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
-import org.bukkit.Bukkit;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.checkerframework.checker.nullness.qual.Nullable;
-
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
-
-import static java.util.Objects.requireNonNull;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 public final class HTTPMineSwapServer implements MineSwapServer {
 
   private final MineSwap plugin;
   private final BlockPagedStore store;
+  private final ExecutorService asyncExecutor;
 
   private @Nullable Javalin app;
 
   public HTTPMineSwapServer(final MineSwap plugin, final BlockPagedStore store) {
     this.plugin = plugin;
     this.store = store;
+    this.asyncExecutor = Executors.newWorkStealingPool();
   }
 
   public void start() {
@@ -39,6 +57,7 @@ public final class HTTPMineSwapServer implements MineSwapServer {
     Preconditions.checkNotNull(this.app, "Server is already stopped");
     final Javalin app = requireNonNull(this.app);
     app.stop();
+    this.asyncExecutor.shutdown();
     this.app = null;
   }
 
@@ -67,13 +86,12 @@ public final class HTTPMineSwapServer implements MineSwapServer {
       return;
     }
 
-    final CompletableFuture<String> future = new CompletableFuture<>();
-    final BukkitScheduler scheduler = Bukkit.getScheduler();
-    scheduler.runTask(this.plugin, () -> {
-      this.store.queueWritePage(id, res);
-      future.complete("OK");
-    });
-    context.future(() -> future.thenAccept(_ -> context.status(HttpStatus.OK)));
+    final CompletableFuture<Void> future = CompletableFuture.runAsync(
+        () -> {
+          this.store.queueWritePage(id, res);
+        },
+        this.asyncExecutor);
+    context.future(() -> future.thenRun(() -> context.status(HttpStatus.OK)));
   }
 
   private void handlePageGet(final Context context) {
@@ -83,13 +101,12 @@ public final class HTTPMineSwapServer implements MineSwapServer {
     }
 
     final int id = optionalId.getAsInt();
-    final CompletableFuture<String> future = new CompletableFuture<>();
-    final BukkitScheduler scheduler = Bukkit.getScheduler();
-    scheduler.runTask(this.plugin, () -> {
-      final byte[] result = this.store.readPage(id);
-      final String base64 = IOUtils.encodeIntoBase64(result);
-      future.complete(base64);
-    });
+    final CompletableFuture<String> future = CompletableFuture.supplyAsync(
+        () -> {
+          final byte[] result = this.store.readPage(id);
+          return IOUtils.encodeIntoBase64(result);
+        },
+        this.asyncExecutor);
     context.future(() -> future.thenAccept(context::result));
   }
 

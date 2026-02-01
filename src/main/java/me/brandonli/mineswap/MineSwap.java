@@ -1,47 +1,61 @@
+/*
+ * This file is part of MineSwap, a poor guy's RAM alternative
+ * Copyright (C) Brandon Li <https://brandonli.me/>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package me.brandonli.mineswap;
 
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
+import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.List;
-
 public final class MineSwap extends JavaPlugin {
 
   private HTTPMineSwapServer server;
-  private EditSession session;
+  private BlockTransactionQueue queue;
 
-  private EditSession getEditSession() {
+  @SuppressWarnings("deprecation")
+  public EditSession createEditSession() {
     final List<World> worlds = Bukkit.getWorlds();
-    final org.bukkit.World world = worlds.getFirst();
+    final World world = worlds.getFirst();
     final com.sk89q.worldedit.world.World wrapped = BukkitAdapter.adapt(world);
     final WorldEdit worldEdit = WorldEdit.getInstance();
-    return worldEdit.newEditSession(wrapped);
+    final EditSession session = worldEdit.newEditSession(wrapped);
+    session.setFastMode(true);
+    return session;
   }
 
   @Override
   public void onEnable() {
-    this.session = this.getEditSession();
-    final BlockTransactionQueue queue = new BlockTransactionQueue(this);
-    final BlockPagedStore store = new BlockPagedStore(this, queue);
+    this.queue = new BlockTransactionQueue(this);
+    final BlockPagedStore store = new BlockPagedStore(this, this.queue);
     this.server = new HTTPMineSwapServer(this, store);
     this.server.start();
   }
 
   @Override
   public void onDisable() {
-    if (this.session != null) {
-      this.session.close();
+    if (this.queue != null) {
+      this.queue.shutdown();
     }
     if (this.server != null) {
       this.server.stop();
     }
-  }
-
-  public EditSession getSession() {
-    return this.session;
   }
 }
