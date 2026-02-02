@@ -17,11 +17,18 @@
  */
 package me.brandonli.mineswap.page.accessor;
 
+import static java.util.Objects.requireNonNull;
+
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import me.brandonli.mineswap.page.Page;
 import me.brandonli.mineswap.utils.IOUtils;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -31,13 +38,6 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.craftbukkit.util.CraftMagicNumbers;
-
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
-import static java.util.Objects.requireNonNull;
 
 public final class ChunkPageAccessor implements PageAccessor {
 
@@ -52,7 +52,12 @@ public final class ChunkPageAccessor implements PageAccessor {
   private static final Map<BlockState, Integer> PALETTE_TO_INDEX;
 
   static {
-    INDEX_TO_PALETTE = IOUtils.getLinesFromResource("palette.txt").stream().map(Material::valueOf).map(CraftMagicNumbers::getBlock).filter(Objects::nonNull).map(net.minecraft.world.level.block.Block::defaultBlockState).toArray(BlockState[]::new);
+    INDEX_TO_PALETTE = IOUtils.getLinesFromResource("palette.txt").stream()
+        .map(Material::valueOf)
+        .map(CraftMagicNumbers::getBlock)
+        .filter(Objects::nonNull)
+        .map(Block::defaultBlockState)
+        .toArray(BlockState[]::new);
     PALETTE_TO_INDEX = new IdentityHashMap<>(INDEX_TO_PALETTE.length);
     for (int i = 0; i < INDEX_TO_PALETTE.length; i++) {
       PALETTE_TO_INDEX.put(INDEX_TO_PALETTE[i], i);
@@ -137,7 +142,8 @@ public final class ChunkPageAccessor implements PageAccessor {
     }
 
     final LevelLightEngine lightEngine = this.level.getLightEngine();
-    final ClientboundLevelChunkWithLightPacket packet = new ClientboundLevelChunkWithLightPacket(chunk, lightEngine, null, null, true);
+    final ClientboundLevelChunkWithLightPacket packet =
+        new ClientboundLevelChunkWithLightPacket(chunk, lightEngine, null, null, true);
     players.forEach(player -> player.connection.send(packet));
   }
 

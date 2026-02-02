@@ -23,5 +23,4 @@ public interface Page {
   int PAGES_PER_TICK = 1_000;
   int PAGE_PORT = 8080;
   int PAGE_SIZE_BYTES = 98304;
-
 }

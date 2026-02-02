@@ -17,6 +17,8 @@
  */
 package me.brandonli.mineswap.page.accessor;
 
+import static java.util.Objects.requireNonNull;
+
 import me.brandonli.mineswap.page.Page;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -27,8 +29,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.checkerframework.checker.nullness.qual.Nullable;
-
-import static java.util.Objects.requireNonNull;
 
 public final class MapPageAccessor implements PageAccessor {
 

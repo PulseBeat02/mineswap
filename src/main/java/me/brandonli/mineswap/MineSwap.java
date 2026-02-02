@@ -17,10 +17,12 @@
  */
 package me.brandonli.mineswap;
 
+import static java.util.Objects.requireNonNull;
+
 import me.brandonli.mineswap.http.HTTPMineSwapServer;
 import me.brandonli.mineswap.page.BlockPagedStore;
 import me.brandonli.mineswap.page.Page;
-import me.brandonli.mineswap.page.accessor.MapPageAccessor;
+import me.brandonli.mineswap.page.accessor.ChunkPageAccessor;
 import me.brandonli.mineswap.page.accessor.PageAccessor;
 import me.brandonli.mineswap.utils.VoidChunkGenerator;
 import org.bukkit.Bukkit;
@@ -29,8 +31,6 @@ import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import static java.util.Objects.requireNonNull;
 
 public final class MineSwap extends JavaPlugin {
 
@@ -44,7 +44,7 @@ public final class MineSwap extends JavaPlugin {
     this.swapWorld = this.getOrCreateSwapWorld();
     this.store = new BlockPagedStore(this);
     this.server = new HTTPMineSwapServer(this, this.store);
-    this.accessor = new MapPageAccessor();
+    this.accessor = new ChunkPageAccessor();
     this.server.start();
   }
 
