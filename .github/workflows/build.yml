@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp build/libs/MineSwap-*-all.jar dist/
+          cp build/libs/mineswap-*-all.jar dist/
           ls -la dist/
 
       - name: Upload build artifact
